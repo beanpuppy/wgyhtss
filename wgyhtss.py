@@ -1,0 +1,43 @@
+import requests
+import os
+
+from fastai.learner import load_learner
+from multiprocessing import Process, Queue
+from datetime import datetime
+
+from util import (
+    record_wav,
+    create_spectrogram
+)
+
+SERVER_IP = "192.168.1.169:5000"
+SERVER_KEY = os.environ["WGYHTSS_KEY"]
+
+def record_audio(queue):
+    while True:
+        filename = datetime.now().strftime("%Y%m%d%H%M%S") + ".wav"
+        record_wav(filename, 15)
+        queue.put(filename)
+
+def predict_queue(queue, learn_inf):
+    while True:
+        audio_path = queue.get(block=True)
+        path = create_spectrogram(audio_path)
+        prediction = learn_inf.predict(path)
+
+        if prediction[0] == "scream":
+            requests.get(r"http://{SERVER_IP}/dos?key={SERVER_KEY}", timeout=60)
+
+if __name__ == "__main__":
+    learn_inf = load_learner("export.pkl")
+
+    queue = Queue()
+
+    record_process = Process(target=record_audio, args=(queue,))
+    predict_process = Process(target=predict_queue, args=(queue, learn_inf))
+
+    record_process.start()
+    predict_process.start()
+
+    record_process.join()
+    predict_process.join()
