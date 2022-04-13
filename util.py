@@ -2,6 +2,9 @@ from pathlib import Path
 from scipy.io import wavfile
 from pydub import AudioSegment
 
+import contextlib
+import os
+import sys
 import matplotlib.pyplot as plt
 import math
 import pyaudio
@@ -18,6 +21,19 @@ FORMAT = pyaudio.paInt16
 AUDIO_DIR = Path('./data/audio/full')
 SEGMENT_DIR = Path('./data/audio/segement')
 SPEC_DIR = Path('./data/spectrograms')
+
+@contextlib.contextmanager
+def ignore_stderr():
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    old_stderr = os.dup(2)
+    sys.stderr.flush()
+    os.dup2(devnull, 2)
+    os.close(devnull)
+    try:
+        yield
+    finally:
+        os.dup2(old_stderr, 2)
+        os.close(old_stderr)
 
 def single_split(audio, from_sec, to_sec, file):
     t1 = from_sec * 1000

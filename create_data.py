@@ -24,7 +24,7 @@ def record_audio(queue):
 def segment_queue(queue):
     while True:
         audio_path = queue.get(block=True)
-        paths = create_segments(audio_path)
+        paths = create_segments(AUDIO_DIR / audio_path)
 
         for path in paths:
             create_spectrogram(path)
