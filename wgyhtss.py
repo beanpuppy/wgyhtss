@@ -1,5 +1,6 @@
 import requests
 import os
+import logging
 
 from fastai.learner import load_learner
 from multiprocessing import Process, Queue
@@ -7,13 +8,22 @@ from datetime import datetime
 
 from util import (
     AUDIO_DIR,
+    SEGMENT_DIR,
+    SPEC_DIR,
     record_wav,
     create_spectrogram,
     ignore_stderr
 )
 
 SERVER_IP = "192.168.1.169:5000"
-SERVER_KEY = os.environ["WGYHTSS_KEY"]
+SERVER_KEY = os.environ.get("WGYHTSS_KEY", None)
+
+logger = logging.getLogger("wgyhtss")
+handler = logging.StreamHandler()
+formatter = logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s')
+handler.setFormatter(formatter)
+logger.addHandler(handler)
+logger.setLevel(logging.DEBUG)
 
 def record_audio(queue):
     while True:
@@ -30,14 +40,23 @@ def predict_queue(queue, learn_inf):
     while True:
         audio_path = queue.get(block=True)
         path = create_spectrogram(AUDIO_DIR / audio_path)
-        prediction = learn_inf.predict(path)
+        pred, pred_idx, probs = learn_inf.predict(path)
 
-        print(prediction)
+        logger.debug(f"prediction: {pred} [{probs[pred_idx]:.2%}]")
 
-        if prediction[0] == "scream":
+        if pred == "scream" and probs[pred_idx] > 0.85 and SERVER_KEY:
             requests.get(r"http://{SERVER_IP}/dos?key={SERVER_KEY}", timeout=60)
 
+            # Clear queue, sending a req will cause a lot to be in the backlog
+            # we want to deal with it fresh
+            while not queue.empty():
+                queue.get()
+
 if __name__ == "__main__":
+    AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    SEGMENT_DIR.mkdir(parents=True, exist_ok=True)
+    SPEC_DIR.mkdir(parents=True, exist_ok=True)
+
     learn_inf = load_learner("export.pkl")
 
     queue = Queue()

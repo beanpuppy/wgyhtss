@@ -62,6 +62,7 @@ def create_spectrogram(wav_file):
     ax.specgram(x=audio, Fs=rate, noverlap=384, NFFT=512)
     ax.axis('off')
     fig.savefig(path, dpi=300)
+    plt.close(fig)
     return path
 
 def record_wav(filename, seconds):
